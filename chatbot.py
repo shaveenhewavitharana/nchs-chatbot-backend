@@ -1,7 +1,7 @@
 import os
 import re
 import json
-import requests # Added to send data directly to the API
+import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -14,16 +14,7 @@ try:
 except Exception:
     pass
 
-# Safely get the API key
-api_key = os.environ.get("LLAMA_API_KEY")
-
-# 1. Initialize the Llama Client
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://api.groq.com/openai/v1"
-)
-
-# 2. Save function (UPDATED for Vercel: Direct API Delivery)
+# 2. Save function: Direct API Delivery
 def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: str, interest_score: int = 3) -> str:
     """Sends a user's details directly to the NCHS Campus API."""
     
@@ -124,8 +115,16 @@ tools = [
 
 # 4. Main Response Generator
 def generate_response(user_message: str) -> str:
+    # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
+    api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        return "Error: LLAMA_API_KEY was not found."
+        return "Error: LLAMA_API_KEY was not found in your environment variables."
+
+    # Initialize the client dynamically
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1"
+    )
 
     chat_history.append({"role": "user", "content": user_message})
 
