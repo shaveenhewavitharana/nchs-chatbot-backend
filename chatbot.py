@@ -1,16 +1,21 @@
 import os
-import csv
 import re
 import json
+import requests # Added to send data directly to the API
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Locate and load the .env file
-base_dir = os.path.dirname(os.path.abspath(__file__))
-dotenv_path = os.path.join(base_dir, "..", ".env")
-load_dotenv(dotenv_path=dotenv_path, override=True)
+# Locate and load the .env file for local testing 
+# (Vercel will ignore this and use your Dashboard Environment Variables)
+try:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    dotenv_path = os.path.join(base_dir, "..", ".env")
+    load_dotenv(dotenv_path=dotenv_path, override=True)
+except Exception:
+    pass
 
-api_key = os.getenv("LLAMA_API_KEY")
+# Safely get the API key
+api_key = os.environ.get("LLAMA_API_KEY")
 
 # 1. Initialize the Llama Client
 client = OpenAI(
@@ -18,26 +23,44 @@ client = OpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
-# 2. Save function 
+# 2. Save function (UPDATED for Vercel: Direct API Delivery)
 def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: str, interest_score: int = 3) -> str:
-    """Saves a user's details, including the selected branch and pathway, to a CSV file."""
+    """Sends a user's details directly to the NCHS Campus API."""
+    
     clean_phone = re.sub(r"\D", "", phone)
     if len(clean_phone) != 10:
         return "Error: The phone number must contain exactly 10 digits."
 
-    csv_path = os.path.join(base_dir, "..", "leads.csv")
-    file_exists = os.path.exists(csv_path)
+    # Prepare the payload exactly as the NCHS API expects it
+    student_data = {
+        "name": name,
+        "email": email,
+        "mobile": clean_phone,
+        "mobile2": "",
+        "mobile3": "",
+        "mobile4": "",
+        "branch": branch,
+        "pathway": pathway,
+        "mktmode": "WEB",
+        "submktmode": "Chatbot",
+        "course": "General Inquiry",
+        "qualification": "N/A",
+        "remarks": f"Interest Score: {interest_score}" 
+    }
 
     try:
-        with open(csv_path, "a", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            if not file_exists:
-                writer.writerow(["Name", "Email", "Phone Number", "Branch", "Pathway", "Interest Score"])
+        # Send instantly to the live NCHS database
+        headers = {'Content-Type': 'application/json'}
+        api_url = "https://api.nchs.edu.lk/api/website/lead"
+        response = requests.post(api_url, json=student_data, headers=headers, timeout=10)
+        
+        if response.status_code == 200 and response.json().get("success"):
+            return "Contact information processed and delivered to counselors successfully."
+        else:
+            return "Contact information processed, but API delivery failed."
             
-            writer.writerow([name, email, clean_phone, branch, pathway, interest_score])
-        return "Contact information processed successfully."
     except Exception as e:
-        return f"Error saving to CSV: {str(e)}"
+        return f"Error sending to API: {str(e)}"
 
 # 3. Define the Tool and Instructions for Llama
 nchs_dataset = """
@@ -53,7 +76,6 @@ NCHS CAMPUS DATASET:
 - Partnerships: California State University, Monterey Bay (USA) & Ulster University (UK).
 """
 
-# UPDATED PROMPT: The AI will now wait for the user to say "yes" before triggering the form.
 chat_history = [
     {
         "role": "system",
@@ -103,7 +125,7 @@ tools = [
 # 4. Main Response Generator
 def generate_response(user_message: str) -> str:
     if not api_key:
-        return "Error: LLAMA_API_KEY was not found in your .env file."
+        return "Error: LLAMA_API_KEY was not found."
 
     chat_history.append({"role": "user", "content": user_message})
 
