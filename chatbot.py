@@ -130,7 +130,7 @@ def generate_response(user_message: str) -> str:
 
     try:
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="meta-llama/llama-prompt-guard-2-86m",
             messages=chat_history,
             tools=tools,
             temperature=0.5
@@ -166,7 +166,7 @@ def generate_response(user_message: str) -> str:
                     })
             
             final_response = client.chat.completions.create(
-               model="llama-3.3-70b-versatile",
+               model="meta-llama/llama-prompt-guard-2-86m",
                 messages=chat_history
             )
             final_text = final_response.choices[0].message.content
