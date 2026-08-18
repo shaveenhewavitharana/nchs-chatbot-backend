@@ -129,9 +129,8 @@ def generate_response(user_message: str) -> str:
     chat_history.append({"role": "user", "content": user_message})
 
     try:
-        # UPDATED TO AN ACTIVE MODEL
         response = client.chat.completions.create(
-            model="openai/gpt-oss-120b", 
+            model="openai/gpt-oss-120b",
             messages=chat_history,
             tools=tools,
             temperature=0.5
@@ -166,10 +165,11 @@ def generate_response(user_message: str) -> str:
                         "content": function_result
                     })
             
-           # UPDATED THE SECOND API CALL TO MATCH
+            # ---> THE FIX IS HERE: Added tools=tools to this second call <---
             final_response = client.chat.completions.create(
                model="openai/gpt-oss-120b",
-               messages=chat_history
+               messages=chat_history,
+               tools=tools 
             )
             final_text = final_response.choices[0].message.content
             chat_history.append({"role": "assistant", "content": final_text})
