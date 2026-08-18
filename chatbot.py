@@ -5,7 +5,7 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Locate and load the .env file for local testing 
+# 1. Locate and load the .env file for local testing 
 # (Vercel will ignore this and use your Dashboard Environment Variables)
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -129,8 +129,9 @@ def generate_response(user_message: str) -> str:
     chat_history.append({"role": "user", "content": user_message})
 
     try:
+        # UPDATED TO A CONVERSATIONAL MODEL
         response = client.chat.completions.create(
-            model="meta-llama/llama-prompt-guard-2-22m",
+            model="llama-3.1-70b-versatile",
             messages=chat_history,
             tools=tools,
             temperature=0.5
@@ -165,9 +166,10 @@ def generate_response(user_message: str) -> str:
                         "content": function_result
                     })
             
+            # UPDATED THE SECOND API CALL TO MATCH THE NEW MODEL
             final_response = client.chat.completions.create(
-               model="meta-llama/llama-prompt-guard-2-22m",
-                messages=chat_history
+               model="llama-3.1-70b-versatile",
+               messages=chat_history
             )
             final_text = final_response.choices[0].message.content
             chat_history.append({"role": "assistant", "content": final_text})
