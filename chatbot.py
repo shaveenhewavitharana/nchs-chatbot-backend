@@ -129,9 +129,9 @@ def generate_response(user_message: str) -> str:
     chat_history.append({"role": "user", "content": user_message})
 
     try:
-        # UPDATED TO A CONVERSATIONAL MODEL
+        # UPDATED TO AN ACTIVE MODEL
         response = client.chat.completions.create(
-            model="llama-3.1-70b-versatile",
+            model="openai/gpt-oss-120b", 
             messages=chat_history,
             tools=tools,
             temperature=0.5
@@ -166,9 +166,9 @@ def generate_response(user_message: str) -> str:
                         "content": function_result
                     })
             
-            # UPDATED THE SECOND API CALL TO MATCH THE NEW MODEL
+           # UPDATED THE SECOND API CALL TO MATCH
             final_response = client.chat.completions.create(
-               model="llama-3.1-70b-versatile",
+               model="openai/gpt-oss-120b",
                messages=chat_history
             )
             final_text = final_response.choices[0].message.content
