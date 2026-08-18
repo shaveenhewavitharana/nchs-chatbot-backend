@@ -141,9 +141,15 @@ def generate_response(user_message: str) -> str:
         if response_message.tool_calls:
             chat_history.append(response_message)
             
+            # Create a variable to hold the user's name
+            submitted_name = ""
+            
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
+                    
+                    # Capture the name from the form arguments
+                    submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
                     match = re.search(r'\d', raw_score)
@@ -165,7 +171,6 @@ def generate_response(user_message: str) -> str:
                         "content": function_result
                     })
             
-            # The second API call (now correctly includes tools=tools)
             final_response = client.chat.completions.create(
                model="openai/gpt-oss-120b",
                messages=chat_history,
@@ -173,9 +178,13 @@ def generate_response(user_message: str) -> str:
             )
             final_text = final_response.choices[0].message.content
             
-            # FALLBACK FIX: Prevent empty bubbles if the AI returns None
+            # FALLBACK FIX: Now dynamically includes the user's first name
             if not final_text:
-                final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
+                if submitted_name:
+                    first_name = submitted_name.split()[0] # Grabs just the first name
+                    final_text = f"Thank you, {first_name}! Your details have been successfully saved, and a counselor will reach out to you shortly."
+                else:
+                    final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 
             chat_history.append({"role": "assistant", "content": final_text})
             return final_text
@@ -183,7 +192,6 @@ def generate_response(user_message: str) -> str:
         else:
             final_text = response_message.content
             
-            # FALLBACK FIX: Prevent empty bubbles on standard messages
             if not final_text:
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
                  
