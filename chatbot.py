@@ -165,18 +165,28 @@ def generate_response(user_message: str) -> str:
                         "content": function_result
                     })
             
-            # ---> THE FIX IS HERE: Added tools=tools to this second call <---
+            # The second API call (now correctly includes tools=tools)
             final_response = client.chat.completions.create(
                model="openai/gpt-oss-120b",
                messages=chat_history,
                tools=tools 
             )
             final_text = final_response.choices[0].message.content
+            
+            # FALLBACK FIX: Prevent empty bubbles if the AI returns None
+            if not final_text:
+                final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
+                
             chat_history.append({"role": "assistant", "content": final_text})
             return final_text
             
         else:
             final_text = response_message.content
+            
+            # FALLBACK FIX: Prevent empty bubbles on standard messages
+            if not final_text:
+                 final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
+                 
             chat_history.append({"role": "assistant", "content": final_text})
             return final_text
 
