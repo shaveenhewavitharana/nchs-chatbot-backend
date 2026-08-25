@@ -37,9 +37,12 @@ async def verify_whatsapp_webhook(request: Request):
     token = request.query_params.get("hub.verify_token")
     challenge = request.query_params.get("hub.challenge")
 
+    # Handle Meta subscription verification challenge
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return int(challenge) if challenge else "OK"
-    raise HTTPException(status_code=403, detail="Verification failed: Invalid verify token")
+    
+    # Return a friendly dictionary for background pings instead of crashing with 403
+    return {"status": "Webhook endpoint active"}
 
 # --- 2. WhatsApp Incoming Message Receiver Webhook (POST) ---
 @app.post("/whatsapp")
@@ -47,22 +50,24 @@ async def receive_whatsapp_message(request: Request):
     try:
         data = await request.json()
         
-        entry = data.get("entry", [])[0]
-        changes = entry.get("changes", [])[0]
-        value = changes.get("value", {})
-        messages = value.get("messages", [])
+        entry = data.get("entry", [])
+        if entry:
+            changes = entry[0].get("changes", [])
+            if changes:
+                value = changes[0].get("value", {})
+                messages = value.get("messages", [])
 
-        if messages:
-            message = messages[0]
-            from_number = message.get("from") # Student's WhatsApp phone number
-            message_body = message.get("text", {}).get("body", "")
+                if messages:
+                    message = messages[0]
+                    from_number = message.get("from") # Student's WhatsApp phone number
+                    message_body = message.get("text", {}).get("body", "")
 
-            if message_body:
-                # Generate AI response using your existing chatbot logic
-                bot_reply = generate_response(message_body)
+                    if message_body:
+                        # Generate AI response using your existing chatbot logic
+                        bot_reply = generate_response(message_body)
 
-                # Send response back to the user via WhatsApp API
-                send_whatsapp_message(from_number, bot_reply)
+                        # Send response back to the user via WhatsApp API
+                        send_whatsapp_message(from_number, bot_reply)
 
     except Exception as e:
         print(f"Error handling WhatsApp message: {e}")
