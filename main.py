@@ -18,7 +18,7 @@ app.add_middleware(
 
 # --- Environment Configuration for WhatsApp ---
 WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN")
-PHONE_NUMBER_ID = os.environ.get("PHONE_NUMBER_ID", "1315106585012589")
+PHONE_NUMBER_ID = os.environ.get("PHONE_NUMBER_ID", "1247454688458874")
 VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "nchs_secure_verify_token_123")
 
 class Message(BaseModel):
