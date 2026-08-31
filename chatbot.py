@@ -6,7 +6,6 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 # 1. Locate and load the .env file for local testing 
-# (Vercel will ignore this and use your Dashboard Environment Variables)
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dotenv_path = os.path.join(base_dir, "..", ".env")
@@ -67,26 +66,32 @@ NCHS CAMPUS DATASET:
 - Partnerships: California State University, Monterey Bay (USA) & Ulster University (UK).
 """
 
-chat_history = [
-    {
-        "role": "system",
-        "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
-        Use this dataset: {nchs_dataset}
+# Store the base system prompt separately so we can reset history safely
+SYSTEM_PROMPT = {
+    "role": "system",
+    "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
+    Use this dataset: {nchs_dataset}
 
-        WORKFLOW:
-        1. Answer the user's questions regarding courses or general inquiries.
-        2. Politely ask if they would like to speak with an NCHS counselor for further details.
-        3. WAIT for the user to respond. DO NOT send the contact form template yet.
-        4. IF the user agrees to be contacted, reply with a brief friendly acknowledgment and append this EXACT template to trigger the form:
-           "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
-        5. When the user provides their details, call the save_contact_info tool. 
-           CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
-           - 1 or 2 = Low interest (casual browsing, short or vague questions).
-           - 3 = Medium interest (asking about general course options).
-           - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
-        6. Once successfully saved, thank them and inform them a representative will reach out."""
-    }
-]
+    CRITICAL RULES:
+    - NEVER assume the user's name is Shaveen or any other name. Always ask for their name if you do not know it.
+    - Treat every new conversation as a completely new student.
+
+    WORKFLOW:
+    1. Answer the user's questions regarding courses or general inquiries.
+    2. Politely ask if they would like to speak with an NCHS counselor for further details.
+    3. WAIT for the user to respond. DO NOT send the contact form template yet.
+    4. IF the user agrees to be contacted, reply with a brief friendly acknowledgment and append this EXACT template to trigger the form:
+       "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
+    5. When the user provides their details, call the save_contact_info tool. 
+       CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
+       - 1 or 2 = Low interest (casual browsing, short or vague questions).
+       - 3 = Medium interest (asking about general course options).
+       - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
+    6. Once successfully saved, thank them and inform them a representative will reach out."""
+}
+
+# Initialize global history
+chat_history = [SYSTEM_PROMPT]
 
 tools = [
     {
@@ -99,7 +104,7 @@ tools = [
                 "properties": {
                     "name": {"type": "string", "description": "The user's name"},
                     "email": {"type": "string", "description": "The user's email address"},
-                    "phone": {"type": "string", "description": "The Your phone number"},
+                    "phone": {"type": "string", "description": "The user's phone number"},
                     "branch": {"type": "string", "description": "The chosen branch (CMB or KND)"},
                     "pathway": {"type": "string", "description": "The chosen pathway (SUT or USA or UK or FED or CAN)"},
                     "interest_score": {
@@ -115,12 +120,16 @@ tools = [
 
 # 4. Main Response Generator
 def generate_response(user_message: str) -> str:
-    # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
+    global chat_history
+    
+    # Prevent memory leaks: If history gets too long, reset it back to just the system prompt
+    if len(chat_history) > 15:
+        chat_history = [SYSTEM_PROMPT]
+
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return "Error: LLAMA_API_KEY was not found in your environment variables."
 
-    # Initialize the client dynamically
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1"
@@ -141,14 +150,12 @@ def generate_response(user_message: str) -> str:
         if response_message.tool_calls:
             chat_history.append(response_message)
             
-            # Create a variable to hold the user's name
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
                     
-                    # Capture the name from the form arguments
                     submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
@@ -178,10 +185,9 @@ def generate_response(user_message: str) -> str:
             )
             final_text = final_response.choices[0].message.content
             
-            # FALLBACK FIX: Now dynamically includes the user's first name
             if not final_text:
                 if submitted_name:
-                    first_name = submitted_name.split()[0] # Grabs just the first name
+                    first_name = submitted_name.split()[0]
                     final_text = f"Thank you, {first_name}! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 else:
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
