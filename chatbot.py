@@ -5,7 +5,6 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# 1. Locate and load the .env file for local testing 
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dotenv_path = os.path.join(base_dir, "..", ".env")
@@ -13,15 +12,11 @@ try:
 except Exception:
     pass
 
-# 2. Save function: Direct API Delivery
 def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: str, interest_score: int = 3) -> str:
-    """Sends a user's details directly to the NCHS Campus API."""
-    
     clean_phone = re.sub(r"\D", "", phone)
     if len(clean_phone) != 10:
         return "Error: The phone number must contain exactly 10 digits."
 
-    # Prepare the payload exactly as the NCHS API expects it
     student_data = {
         "name": name,
         "email": email,
@@ -39,7 +34,6 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
     }
 
     try:
-        # Send instantly to the live NCHS database
         headers = {'Content-Type': 'application/json'}
         api_url = "https://api.nchs.edu.lk/api/website/lead"
         response = requests.post(api_url, json=student_data, headers=headers, timeout=10)
@@ -52,45 +46,45 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
     except Exception as e:
         return f"Error sending to API: {str(e)}"
 
-# 3. Define the Tool and Instructions for Llama
-nchs_dataset = """
-NCHS CAMPUS DATASET:
-- Federation University Programmes (3 Years, Full-Time, Intakes: Feb/June/Oct):
-  * Bachelor of Business (Management or Marketing)
-  * Bachelor of IT (Software Development, Business Information Systems)
-- Swinburne University Pathways:
-  * Fields: Business, IT, Engineering, Health Science
-  * Foundation Year: Pathway to 1st year Bachelor
-  * UniLink Diploma in Health Science: 8-month pathway to 2nd year Bachelor.
-  * Health Science Specializations: Applied Statistics, Biomedical Science, Nutrition, Psychology, etc.
-- Partnerships: California State University, Monterey Bay (USA) & Ulster University (UK).
-"""
-
-# Store the base system prompt separately so we can reset history safely
+# The newly trained System Prompt based on your document workflows
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
-    Use this dataset: {nchs_dataset}
+    "content": """You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). 
+    Your goal is to guide students and collect their information naturally.
 
     CRITICAL RULES:
-    - NEVER assume the user's name is Shaveen or any other name. Always ask for their name if you do not know it.
+    - ASK ONE QUESTION AT A TIME. Wait for the user to answer before moving to the next step. Do not bombard them.
+    - NEVER assume the user's name.
     - Treat every new conversation as a completely new student.
 
-    WORKFLOW:
-    1. Answer the user's questions regarding courses or general inquiries.
-    2. Politely ask if they would like to speak with an NCHS counselor for further details.
-    3. WAIT for the user to respond. DO NOT send the contact form template yet.
-    4. IF the user agrees to be contacted, reply with a brief friendly acknowledgment and append this EXACT template to trigger the form:
-       "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
-    5. When the user provides their details, call the save_contact_info tool. 
-       CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
-       - 1 or 2 = Low interest (casual browsing, short or vague questions).
-       - 3 = Medium interest (asking about general course options).
-       - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
-    6. Once successfully saved, thank them and inform them a representative will reach out."""
+    CONVERSATIONAL FLOW:
+    Step 1: Greet and politely ask for their Name, Age, and Contact Number.
+    Step 2: Ask about their education status: Have they completed O/Ls, completed A/Ls, or are they waiting for A/L results?
+    
+    Step 3 (Branching based on Step 2):
+      * IF COMPLETED A/L: 
+        - Ask if it was Local or London, their stream, and their results (including General English).
+        - Condition: If they got an 'S' pass or below for General English, inform them they need IELTS (Overall 5.5) or PTE (Overall 42) before commencing.
+        - Ask which degree pathway they want (Business, IT, Science, Engineering).
+      * IF O/L STUDENT: 
+        - Ask for their exam year and results. 
+        - Condition: If they have 4 or more 'A' passes, congratulate them on being eligible for an NCHS scholarship!
+        - Ask for their English grade and preferred stream.
+      * IF PENDING A/L: 
+        - Ask for their A/L stream and O/L English result. 
+        - Briefly explain that you offer Diploma/Foundation options and Australian pathways.
+        
+    Step 4: Ask which NCHS branch is easiest to visit (Colombo or Kandy).
+    Step 5: Ask for their Email address to finalize their profile.
+    Step 6: Ask if they would like to arrange a free counseling session (via Call or WhatsApp) and what time is convenient.
+    
+    Step 7 (Final Trigger): 
+    If they agree to be contacted, politely acknowledge it and output this EXACT string to trigger the system form (do not alter this format):
+    "Name: [Their Name], Email: [Their Email], Number: [Their Phone Number], Branch: [Branch], Pathway: [Pathway]"
+    
+    Once the form triggers and the save_contact_info tool is called, thank them and inform them a counselor will reach out at their preferred time."""
 }
 
-# Initialize global history
 chat_history = [SYSTEM_PROMPT]
 
 tools = [
@@ -118,12 +112,10 @@ tools = [
     }
 ]
 
-# 4. Main Response Generator
 def generate_response(user_message: str) -> str:
     global chat_history
     
-    # Prevent memory leaks: If history gets too long, reset it back to just the system prompt
-    if len(chat_history) > 15:
+    if len(chat_history) > 20:
         chat_history = [SYSTEM_PROMPT]
 
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
@@ -142,20 +134,18 @@ def generate_response(user_message: str) -> str:
             model="openai/gpt-oss-120b",
             messages=chat_history,
             tools=tools,
-            temperature=0.5
+            temperature=0.4
         )
         
         response_message = response.choices[0].message
 
         if response_message.tool_calls:
             chat_history.append(response_message)
-            
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
-                    
                     submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
@@ -197,7 +187,6 @@ def generate_response(user_message: str) -> str:
             
         else:
             final_text = response_message.content
-            
             if not final_text:
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
                  
