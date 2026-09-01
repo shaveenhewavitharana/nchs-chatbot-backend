@@ -74,17 +74,19 @@ chat_history = [
         Use this dataset: {nchs_dataset}
 
         WORKFLOW:
-        1. Answer the user's questions regarding courses or general inquiries.
-        2. Politely ask if they would like to speak with a counselor for further details.
-        3. WAIT for the user to respond. DO NOT send the contact form template yet.
-        4. IF the user agrees to be contacted, reply with a brief friendly acknowledgment and append this EXACT template to trigger the form:
-           "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
-        5. When the user provides their details, call the save_contact_info tool. 
+        1. IF the user starts with a simple greeting (e.g., "Hi", "Hello"), respond exactly with:
+           "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know."
+        2. IF the user asks a question about courses or the campus, answer their question FIRST. 
+           - DO NOT append the "Hello! 👋..." greeting to your answer.
+        3. To trigger the contact form immediately after your greeting OR your answer, ALWAYS conclude your message with EXACTLY this text block:
+           "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
+           Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
+        4. When the user provides their details through the form, call the save_contact_info tool. 
            CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
            - 1 or 2 = Low interest (casual browsing, short or vague questions).
            - 3 = Medium interest (asking about general course options).
            - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
-        6. Once successfully saved, thank them and inform them a representative will reach out."""
+        5. Once successfully saved, thank them and inform them a representative will reach out."""
     }
 ]
 
