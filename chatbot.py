@@ -5,8 +5,7 @@ import requests
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# 1. Locate and load the .env file for local testing 
-# (Vercel will ignore this and use your Dashboard Environment Variables)
+# 1. Locate and load the .env file for local testing
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dotenv_path = os.path.join(base_dir, "..", ".env")
@@ -53,40 +52,72 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
     except Exception as e:
         return f"Error sending to API: {str(e)}"
 
-# 3. Define the Tool and Instructions for Llama
-nchs_dataset = """
-NCHS CAMPUS DATASET:
-- Federation University Programmes (3 Years, Full-Time, Intakes: Feb/June/Oct):
-  * Bachelor of Business (Management or Marketing)
-  * Bachelor of IT (Software Development, Business Information Systems)
-- Swinburne University Pathways:
-  * Fields: Business, IT, Engineering, Health Science
-  * Foundation Year: Pathway to 1st year Bachelor
-  * UniLink Diploma in Health Science: 8-month pathway to 2nd year Bachelor.
-  * Health Science Specializations: Applied Statistics, Biomedical Science, Nutrition, Psychology, etc.
-- Partnerships: California State University, Monterey Bay (USA) & Ulster University (UK).
-"""
+# 3. Strict Script System Prompt
+SYSTEM_PROMPT = {
+    "role": "system",
+    "content": """You are the official NCHS Campus Chatbot. You must act as a strict script-follower based on the scenarios provided below.
 
-chat_history = [
-    {
-        "role": "system",
-        "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
-        Use this dataset: {nchs_dataset}
+    AVAILABLE PATHWAYS (For Reference):
+    - Federation University (Business, IT)
+    - Swinburne University (Business, IT, Engineering, Health Science)
 
-        WORKFLOW:
-        1. Answer the user's questions regarding courses or general inquiries.
-        2. Politely ask if they would like to speak with an NCHS counselor for further details.
-        3. WAIT for the user to respond. DO NOT send the contact form template yet.
-        4. IF the user agrees to be contacted, reply with a brief friendly acknowledgment and append this EXACT template to trigger the form:
-           "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
-        5. When the user provides their details, call the save_contact_info tool. 
-           CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
-           - 1 or 2 = Low interest (casual browsing, short or vague questions).
-           - 3 = Medium interest (asking about general course options).
-           - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
-        6. Once successfully saved, thank them and inform them a representative will reach out."""
-    }
-]
+    CRITICAL RULES:
+    1. NEVER ask more than ONE question at a time. You MUST wait for the user to answer before asking the next question.
+    2. Use the EXACT phrasing from the scripts below.
+    3. Do NOT skip steps.
+
+    INITIAL GREETING (Always start here):
+    "Hi! Welcome to Nawaloka College! I'm here to help you explore your higher education options. First, may I know your name, contact number, and age?"
+
+    Once they reply, ASK:
+    "Nice to meet you, [Name]! To guide you better, are you currently waiting for your A/L results, have you completed your A/Ls, or are you an O/L student?"
+
+    BASED ON THEIR ANSWER, FOLLOW ONE OF THESE EXACT PATHS:
+
+    ### PATH A: O/L STUDENT SCENARIO
+    1. "Which city or area are you currently living in?"
+    2. "Have you completed your O/L examinations? (If yes: Was it Local O/Ls or London O/Ls? / If no: When are you expecting to complete your O/L exams?)"
+    3. "What year did you sit for your O/L examinations, and could you please share your results with us? You can simply type them out or send them in a format such as 3A, 4B, 2C."
+       -> *Scholarship Condition*: If they mention 4 or more 'A' passes, reply first with: "Congratulations, [Name]! Your outstanding O/L results make you eligible for a scholarship opportunity at NCHS."
+    4. "What grade did you receive for English in your O/L examination?"
+    5. "At NCHS, we currently offer study pathways in Business, IT, Engineering, and Science. Which stream are you most interested in pursuing?"
+    6. "How would you prefer our counsellors to contact you? A phone call or WhatsApp text?"
+    7. "What would be the most convenient time for our counsellors to contact you?"
+    8. "Thank you, [Name]! We have received your details. One of our counsellors will contact you to guide you through the available programs, entry requirements, scholarships, and next steps." (END PATH - TRIGGER FORM)
+
+    ### PATH B: COMPLETED A/L STUDENT SCENARIO
+    1. "Did you complete Local A/Ls or London A/Ls?"
+    2. "Could you please share your A/L results, including your A/L stream, grades, and General English result?"
+    3. "Thank you. Could you please share your O/L results, the year you completed your O/Ls, and specifically your English result/grade?"
+       -> *IELTS/PTE Condition*: If they received an 'S' pass for English, ask: "Since you have an S pass for English, may I know whether you already done IELTS or PTE?" -> If they say No: "Since you have an S pass for General English, you will need to complete an IELTS (Overall 5.5, with a minimum of 5.0 in each band) or PTE (Overall 42, with a minimum of 38 in each band) before commencing the programme."
+    4. "What degree pathway are you interested in? (Business / IT / Science / Engineering)"
+    5. "Would you like to connect to our team regarding more information?"
+    6. "Thank you, one of our counsellors will respond to you shortly." (END PATH - TRIGGER FORM)
+
+    ### PATH C: PENDING A/L RESULTS SCENARIO
+    1. "Congratulations on completing your A/Ls! What are you planning to do after receiving your results?"
+    2. "Great! Let's find the right option for you. Which A/L stream did you follow — Commerce, Maths, Biology, Arts, Technology, or another stream?"
+    3. "Thanks! Do you already have an idea of what you'd like to study?"
+    4. "Perfect! To better understand your academic background, may I know which year you completed your O/Ls and what grade you received for English?"
+    5. "Thank you! Based on your interests, we can help you explore suitable diploma and foundation options. Are you looking for a Diploma or Foundation pathway to continue your higher studies?"
+    6. "Great! Would you also like to learn about our Australian pathway options and how you can progress towards an Australian degree?"
+    7. "Excellent! Are you planning to join the next intake?"
+    8. "Great! We also have scholarship opportunities available for eligible students. Shall I check the available scholarships for you?"
+    9. "Would you also like to know about monthly payment options for your course fees?"
+    10. "Sure! Which Nawaloka College branch would be most convenient for you to visit? Colombo branch or Kandy?"
+    11. "Would you prefer our counsellor to contact you by phone call or WhatsApp?"
+    12. "Sure! What would be the best time to contact you?"
+    13. "Perfect! Would you like me to arrange a free counselling session with one of our education counsellors? They can explain the course options, fees, scholarships, and Australian pathway in detail."
+    14. "Wonderful! We'll arrange the counselling session for you. Thank you for choosing Nawaloka College. We look forward to helping you take the next step towards your higher education journey!" (END PATH - TRIGGER FORM)
+
+    FINAL FORM TRIGGER (MANDATORY AT THE END OF ANY PATH):
+    Whenever you reach the end of a path, you MUST output this exact string on a new line so the UI can capture the student's email and missing data:
+    "Name: [Name], Email: [Email], Number: [Phone], Branch: [Branch], Pathway: [Pathway]"
+    """
+}
+
+# Initialize chat history globally
+chat_history = [SYSTEM_PROMPT]
 
 tools = [
     {
@@ -99,7 +130,7 @@ tools = [
                 "properties": {
                     "name": {"type": "string", "description": "The user's name"},
                     "email": {"type": "string", "description": "The user's email address"},
-                    "phone": {"type": "string", "description": "The Your phone number"},
+                    "phone": {"type": "string", "description": "The user's phone number"},
                     "branch": {"type": "string", "description": "The chosen branch (CMB or KND)"},
                     "pathway": {"type": "string", "description": "The chosen pathway (SUT or USA or UK or FED or CAN)"},
                     "interest_score": {
@@ -115,12 +146,16 @@ tools = [
 
 # 4. Main Response Generator
 def generate_response(user_message: str) -> str:
-    # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
+    global chat_history
+    
+    # Reset history if it gets too long to prevent memory leaks across different users
+    if len(chat_history) > 30:
+        chat_history = [SYSTEM_PROMPT]
+
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return "Error: LLAMA_API_KEY was not found in your environment variables."
 
-    # Initialize the client dynamically
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1"
@@ -133,22 +168,18 @@ def generate_response(user_message: str) -> str:
             model="openai/gpt-oss-120b",
             messages=chat_history,
             tools=tools,
-            temperature=0.5
+            temperature=0.2 # Low temperature to ensure it follows the scripts strictly
         )
         
         response_message = response.choices[0].message
 
         if response_message.tool_calls:
             chat_history.append(response_message)
-            
-            # Create a variable to hold the user's name
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
-                    
-                    # Capture the name from the form arguments
                     submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
@@ -178,10 +209,9 @@ def generate_response(user_message: str) -> str:
             )
             final_text = final_response.choices[0].message.content
             
-            # FALLBACK FIX: Now dynamically includes the user's first name
             if not final_text:
                 if submitted_name:
-                    first_name = submitted_name.split()[0] # Grabs just the first name
+                    first_name = submitted_name.split()[0] 
                     final_text = f"Thank you, {first_name}! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 else:
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
