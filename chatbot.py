@@ -4,22 +4,24 @@ import json
 import requests
 from openai import OpenAI
 from dotenv import load_dotenv
+
 # 1. Locate and load the .env file for local testing 
 # (Vercel will ignore this and use your Dashboard Environment Variables)
-
 try:
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dotenv_path = os.path.join(base_dir, "..", ".env")
     load_dotenv(dotenv_path=dotenv_path, override=True)
-
 except Exception:
     pass
+
 # 2. Save function: Direct API Delivery
 def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: str, interest_score: int = 3) -> str:
     """Sends a user's details directly to the NCHS Campus API."""
+    
     clean_phone = re.sub(r"\D", "", phone)
     if len(clean_phone) != 10:
         return "Error: The phone number must contain exactly 10 digits."
+
     # Prepare the payload exactly as the NCHS API expects it
     student_data = {
         "name": name,
@@ -42,7 +44,7 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
         headers = {'Content-Type': 'application/json'}
         api_url = "https://api.nchs.edu.lk/api/website/lead"
         response = requests.post(api_url, json=student_data, headers=headers, timeout=10)
-
+        
         if response.status_code == 200 and response.json().get("success"):
             return "Contact information processed and delivered to counselors successfully."
         else:
@@ -50,8 +52,8 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
             
     except Exception as e:
         return f"Error sending to API: {str(e)}"
-# 3. Define the Tool and Instructions for Llama
 
+# 3. Define the Tool and Instructions for Llama
 nchs_dataset = """
 NCHS CAMPUS DATASET:
 - Federation University Programmes (3 Years, Full-Time, Intakes: Feb/June/Oct):
@@ -63,7 +65,6 @@ NCHS CAMPUS DATASET:
   * UniLink Diploma in Health Science: 8-month pathway to 2nd year Bachelor.
   * Health Science Specializations: Applied Statistics, Biomedical Science, Nutrition, Psychology, etc.
 - Partnerships: California State University, Monterey Bay (USA) & Ulster University (UK).
-
 """
 
 chat_history = [
@@ -120,11 +121,11 @@ def generate_response(user_message: str) -> str:
         return "Error: LLAMA_API_KEY was not found in your environment variables."
 
     # Initialize the client dynamically
-
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1"
     )
+
     chat_history.append({"role": "user", "content": user_message})
 
     try:
@@ -134,20 +135,22 @@ def generate_response(user_message: str) -> str:
             tools=tools,
             temperature=0.5
         )
+        
         response_message = response.choices[0].message
 
         if response_message.tool_calls:
             chat_history.append(response_message)
-
+            
             # Create a variable to hold the user's name
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
+                    
                     # Capture the name from the form arguments
                     submitted_name = args.get("name", "").strip()
-
+                    
                     raw_score = str(args.get("interest_score", "3"))
                     match = re.search(r'\d', raw_score)
                     final_score = int(match.group()) if match else 3
@@ -159,23 +162,23 @@ def generate_response(user_message: str) -> str:
                         branch=args.get("branch", "N/A"),
                         pathway=args.get("pathway", "N/A"),
                         interest_score=final_score
-
                     )
+                    
                     chat_history.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
                         "name": "save_contact_info",
                         "content": function_result
-
                     })
+            
             final_response = client.chat.completions.create(
                model="openai/gpt-oss-120b",
                messages=chat_history,
                tools=tools 
             )
             final_text = final_response.choices[0].message.content
+            
             # FALLBACK FIX: Now dynamically includes the user's first name
-
             if not final_text:
                 if submitted_name:
                     first_name = submitted_name.split()[0] # Grabs just the first name
@@ -188,12 +191,12 @@ def generate_response(user_message: str) -> str:
             
         else:
             final_text = response_message.content
+            
             if not final_text:
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
+                 
             chat_history.append({"role": "assistant", "content": final_text})
-
             return final_text
 
     except Exception as e:
-        return f"API Error: {str(e)}" 
-
+        return f"API Error: {str(e)}"
