@@ -74,10 +74,12 @@ chat_history = [
         Use this dataset: {nchs_dataset}
 
         WORKFLOW:
-        1. Answer the user's questions regarding courses or general inquiries.
-        2. When offering further assistance after answering an inquiry, use this exact style of substantial message:
-           "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?" (Ensure 'NCHS' is excluded from the counselor sentence).
-        3. WAIT for the user to respond. DO NOT send the contact form template yet.
+        1. IF the user starts with a simple greeting (e.g., "Hi", "Hello"), respond exactly with:
+           "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
+        2. IF the user asks a question about courses or the campus, answer their question FIRST. 
+           - DO NOT append the "Hello! 👋..." greeting to your answer.
+           - Simply conclude your answer by asking: "Would you like to speak with a counselor for further assistance?"
+        3. WAIT for the user to respond to the counselor offer. DO NOT send the contact form template yet.
         4. IF the user agrees to be contacted, reply with a brief friendly acknowledgment and append this EXACT template to trigger the form:
            "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
         5. When the user provides their details, call the save_contact_info tool. 
