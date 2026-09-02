@@ -14,10 +14,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 1. Update the expected incoming data to include the session_id
 class Message(BaseModel):
     message: str
+    session_id: str = "default_session"
 
 @app.post("/chat")
 async def chat_endpoint(req: Message):
-    reply = generate_response(req.message)
+    # 2. Pass both the message and the session_id to your Python logic
+    reply = generate_response(req.message, req.session_id)
     return {"reply": reply}
