@@ -66,10 +66,14 @@ NCHS CAMPUS DATASET:
 - Partnerships: California State University, Monterey Bay (USA) & Ulster University (UK).
 """
 
-chat_history = [
-    {
-        "role": "system",
-        "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
+# --- NEW: Session management dictionary ---
+active_sessions = {}
+
+def get_initial_history():
+    return [
+        {
+            "role": "system",
+            "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
         Use this dataset: {nchs_dataset}
 
         WORKFLOW:
@@ -100,8 +104,8 @@ chat_history = [
            - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
            
         6. Once successfully saved, thank them and inform them a representative will reach out."""
-    }
-]
+        }
+    ]
 
 tools = [
     {
@@ -129,7 +133,13 @@ tools = [
 ]
 
 # 4. Main Response Generator
-def generate_response(user_message: str) -> str:
+def generate_response(user_message: str, session_id: str = "default_session") -> str:
+    # --- NEW: Grab or create specific session history ---
+    if session_id not in active_sessions:
+        active_sessions[session_id] = get_initial_history()
+        
+    user_chat_history = active_sessions[session_id]
+
     # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -141,12 +151,12 @@ def generate_response(user_message: str) -> str:
         base_url="https://api.groq.com/openai/v1"
     )
 
-    chat_history.append({"role": "user", "content": user_message})
+    user_chat_history.append({"role": "user", "content": user_message})
 
     try:
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
-            messages=chat_history,
+            messages=user_chat_history,
             tools=tools,
             temperature=0.5
         )
@@ -154,7 +164,7 @@ def generate_response(user_message: str) -> str:
         response_message = response.choices[0].message
 
         if response_message.tool_calls:
-            chat_history.append(response_message)
+            user_chat_history.append(response_message)
             
             # Create a variable to hold the user's name
             submitted_name = ""
@@ -179,7 +189,7 @@ def generate_response(user_message: str) -> str:
                         interest_score=final_score
                     )
                     
-                    chat_history.append({
+                    user_chat_history.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
                         "name": "save_contact_info",
@@ -188,7 +198,7 @@ def generate_response(user_message: str) -> str:
             
             final_response = client.chat.completions.create(
                model="openai/gpt-oss-120b",
-               messages=chat_history,
+               messages=user_chat_history,
                tools=tools 
             )
             final_text = final_response.choices[0].message.content
@@ -201,7 +211,7 @@ def generate_response(user_message: str) -> str:
                 else:
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 
-            chat_history.append({"role": "assistant", "content": final_text})
+            user_chat_history.append({"role": "assistant", "content": final_text})
             return final_text
             
         else:
@@ -209,7 +219,7 @@ def generate_response(user_message: str) -> str:
 
             # --- TARGETED FIX: Python-level Failsafe ---
             # If the tool has been used, forcefully scrub the template if the AI hallucinates it
-            form_submitted = any((isinstance(msg, dict) and msg.get("role") == "tool" and msg.get("name") == "save_contact_info") for msg in chat_history)
+            form_submitted = any((isinstance(msg, dict) and msg.get("role") == "tool" and msg.get("name") == "save_contact_info") for msg in user_chat_history)
             
             if final_text and form_submitted and "Name:" in final_text and "Email:" in final_text:
                 if "Please provide your details" in final_text:
@@ -224,7 +234,7 @@ def generate_response(user_message: str) -> str:
             if not final_text:
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
                  
-            chat_history.append({"role": "assistant", "content": final_text})
+            user_chat_history.append({"role": "assistant", "content": final_text})
             return final_text
 
     except Exception as e:
