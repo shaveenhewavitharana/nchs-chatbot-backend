@@ -73,34 +73,31 @@ chat_history = [
         "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
         Use this dataset: {nchs_dataset}
 
-        WORKFLOW:
-        1. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier in the conversation):
-           - Simply answer their questions directly and concisely.
+        CRITICAL WORKFLOW RULES:
+        1. ALREADY SUBMITTED: IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called):
+           - Answer their questions directly and concisely.
            - DO NOT ask if they want to speak to a counselor again.
            - DO NOT output the contact form template again under any circumstances.
            
-        2. IF the user has NOT provided details yet and starts with a simple greeting (e.g., "Hi", "Hello"):
-           - Respond EXACTLY with: "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
-           - STOP. Do NOT send the contact form template yet. Wait for their response.
+        2. SIMPLE GREETINGS: IF the user just says "Hi", "Hello", etc., YOU MUST USE THIS EXACT PHRASE word-for-word:
+           "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
            
-        3. IF the user has NOT provided details yet and agrees to speak with a counselor (e.g., "yes", "okay", "sure"):
+        3. COUNSELOR AGREEMENT: IF the user has NOT provided details yet and agrees to speak with a counselor (e.g., "yes", "okay", "sure"):
            - Respond with: "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process."
            - Append this EXACT template to trigger the form:
              "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
              
-        4. IF the user has NOT provided details yet and asks a specific question about the campus, courses, or pathways:
+        4. SPECIFIC QUESTIONS: IF the user has NOT provided details yet and asks a specific question about the campus or courses:
            - Answer their question FIRST.
            - Then, IMMEDIATELY append this exact text block below your answer to trigger the form:
              "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
              Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
              
-        5. When the user provides their details through the form, call the save_contact_info tool. 
-           CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
-           - 1 or 2 = Low interest (casual browsing, short or vague questions).
-           - 3 = Medium interest (asking about general course options).
-           - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
-           
-        6. Once successfully saved, thank them and inform them a representative will reach out."""
+        5. SCORING & SAVING: When the user provides their details, call the save_contact_info tool. 
+           - 1 or 2 = Low interest.
+           - 3 = Medium interest.
+           - 4 or 5 = High interest.
+           Once successfully saved, thank them and inform them a representative will reach out."""
     }
 ]
 
@@ -131,12 +128,19 @@ tools = [
 
 # 4. Main Response Generator
 def generate_response(user_message: str) -> str:
-    # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
+    # 1. Hardcoded check for simple greetings to guarantee exact text
+    clean_msg = re.sub(r'[^a-zA-Z\s]', '', user_message).strip().lower()
+    if clean_msg in ["hi", "hello", "hey", "hi there", "hello there", "greetings"]:
+        exact_reply = "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
+        chat_history.append({"role": "user", "content": user_message})
+        chat_history.append({"role": "assistant", "content": exact_reply})
+        return exact_reply
+
+    # 2. Proceed with LLM for all other queries
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return "Error: LLAMA_API_KEY was not found in your environment variables."
 
-    # Initialize the client dynamically
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1"
@@ -157,14 +161,12 @@ def generate_response(user_message: str) -> str:
         if response_message.tool_calls:
             chat_history.append(response_message)
             
-            # Create a variable to hold the user's name
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
                     
-                    # Capture the name from the form arguments
                     submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
@@ -194,10 +196,9 @@ def generate_response(user_message: str) -> str:
             )
             final_text = final_response.choices[0].message.content
             
-            # FALLBACK FIX: Now dynamically includes the user's first name
             if not final_text:
                 if submitted_name:
-                    first_name = submitted_name.split()[0] # Grabs just the first name
+                    first_name = submitted_name.split()[0] 
                     final_text = f"Thank you, {first_name}! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 else:
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
