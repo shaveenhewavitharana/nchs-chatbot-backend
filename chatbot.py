@@ -55,7 +55,6 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
 # 3. Define the Tool and Instructions for Llama
 nchs_dataset = """
 NCHS CAMPUS DATASET:
-
 - Swinburne University Pathways
 * NCHS offers pathway programs carefully designed to prepare students for academic success and a transfer to Swinburne University of Technology.
 * Students can apply for the UniLink Diploma utilizing their A/Level results or by successfully completing a recognized foundation-level program.
