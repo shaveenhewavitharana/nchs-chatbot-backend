@@ -55,6 +55,14 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
 # 3. Define the Tool and Instructions for Llama
 nchs_dataset = """
 NCHS CAMPUS DATASET:
+
+- Swinburne University Pathways
+* NCHS offers pathway programs carefully designed to prepare students for academic success and a transfer to Swinburne University of Technology.
+* Students can apply for the UniLink Diploma utilizing their A/Level results or by successfully completing a recognized foundation-level program.
+* **UniLink Diploma in Health Science**: This diploma provides an alternative pathway to a bachelor's degree, allowing students to study concepts, theories, and evidence related to modern health science and global health issues.
+* **Health Science Specializations**: Successful completion provides advanced standing into bachelor's degrees in fields such as Biomedical Science, Health Science, Nutrition, and Psychological Sciences.
+
+
 - Federation University Programmes
 * These are full-time, three-year degree programs delivered on campus in Colombo.
 * The programs offer three intakes per year: February, June, and October.
@@ -62,11 +70,6 @@ NCHS CAMPUS DATASET:
 * **Bachelor of Information Technology**: Students can specialize in Software Development or Business Information Systems. The program focuses on building technical expertise, analytical abilities, and problem-solving skills required for technology-driven industries.
 
 
-- Swinburne University Pathways
-* NCHS offers pathway programs carefully designed to prepare students for academic success and a transfer to Swinburne University of Technology.
-* Students can apply for the UniLink Diploma utilizing their A/Level results or by successfully completing a recognized foundation-level program.
-* **UniLink Diploma in Health Science**: This diploma provides an alternative pathway to a bachelor's degree, allowing students to study concepts, theories, and evidence related to modern health science and global health issues.
-* **Health Science Specializations**: Successful completion provides advanced standing into bachelor's degrees in fields such as Biomedical Science, Health Science, Nutrition, and Psychological Sciences.
 
 
 - Partnerships
