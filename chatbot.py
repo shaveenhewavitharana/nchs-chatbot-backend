@@ -55,15 +55,23 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
 # 3. Define the Tool and Instructions for Llama
 nchs_dataset = """
 NCHS CAMPUS DATASET:
-- Federation University Programmes (3 Years, Full-Time, Intakes: Feb/June/Oct):
-  * Bachelor of Business (Management or Marketing)
-  * Bachelor of IT (Software Development, Business Information Systems)
-- Swinburne University Pathways:
-  * Fields: Business, IT, Engineering, Health Science
-  * Foundation Year: Pathway to 1st year Bachelor
-  * UniLink Diploma in Health Science: 8-month pathway to 2nd year Bachelor.
-  * Health Science Specializations: Applied Statistics, Biomedical Science, Nutrition, Psychology, etc.
-- Partnerships: California State University, Monterey Bay (USA) & Ulster University (UK).
+- Federation University Programmes
+* These are full-time, three-year degree programs delivered on campus in Colombo.
+* The programs offer three intakes per year: February, June, and October.
+* **Bachelor of Business**: This degree allows students to major in either Management or Marketing. It is designed to equip students with the necessary skills to thrive in the corporate landscape, whether they aim to launch a startup, grow a family business, or build a global career.
+* **Bachelor of Information Technology**: Students can specialize in Software Development or Business Information Systems. The program focuses on building technical expertise, analytical abilities, and problem-solving skills required for technology-driven industries.
+
+
+- Swinburne University Pathways
+* NCHS offers pathway programs carefully designed to prepare students for academic success and a transfer to Swinburne University of Technology.
+* Students can apply for the UniLink Diploma utilizing their A/Level results or by successfully completing a recognized foundation-level program.
+* **UniLink Diploma in Health Science**: This diploma provides an alternative pathway to a bachelor's degree, allowing students to study concepts, theories, and evidence related to modern health science and global health issues.
+* **Health Science Specializations**: Successful completion provides advanced standing into bachelor's degrees in fields such as Biomedical Science, Health Science, Nutrition, and Psychological Sciences.
+
+
+- Partnerships
+* NCHS offers distinct transfer pathways to universities in the USA and the UK.
+* While the site outlines pathways to over 15 top UK universities and specific USA institutions like California State University (Northridge and Fresno), specific curriculum details for Ulster University and California State University, Monterey Bay are not prominently detailed on the primary academic program pages.
 """
 
 # --- NEW: Session management dictionary ---
