@@ -55,6 +55,7 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
 # 3. Define the Tool and Instructions for Llama
 nchs_dataset = """
 NCHS CAMPUS DATASET:
+
 - Swinburne University Pathways
 * NCHS offers pathway programs carefully designed to prepare students for academic success and a transfer to Swinburne University of Technology.
 * Students can apply for the UniLink Diploma utilizing their A/Level results or by successfully completing a recognized foundation-level program.
@@ -74,6 +75,20 @@ NCHS CAMPUS DATASET:
 - Partnerships
 * NCHS offers distinct transfer pathways to universities in the USA and the UK.
 * While the site outlines pathways to over 15 top UK universities and specific USA institutions like California State University (Northridge and Fresno), specific curriculum details for Ulster University and California State University, Monterey Bay are not prominently detailed on the primary academic program pages.
+
+
+NCHS Excellence Scholarships (For Study in Sri Lanka)
+If you begin your studies locally in Sri Lanka, NCHS offers several institutional scholarships:
+Value: Students can receive scholarships covering up to 70% of their tuition for their tenure in Sri Lanka.
+Eligibility: Scholarships are awarded based on individual excellence rather than the specific course selected. Criteria include academic performance, extracurricular/athletic achievements, and leadership qualities.
+Eligible Programs: These apply directly to the Swinburne Foundation Program and the UniLink Diploma Program.
+
+Categories Available:
+Academic Excellence Scholarships
+Sports Achievers Scholarships
+Leadership Scholarships (specifically for Head Prefects and Deputy Head Prefects)
+Health Care Professionals Scholarships
+Armed Forces / Police Scholarships
 """
 
 # --- NEW: Session management dictionary ---
