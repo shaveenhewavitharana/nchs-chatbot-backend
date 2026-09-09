@@ -12,15 +12,14 @@ try:
     load_dotenv(dotenv_path=dotenv_path, override=True)
 except Exception:
     pass
-
+    
 # 2. Save function: Direct API Delivery
 def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: str, interest_score: int = 3) -> str:
     """Sends a user's details directly to the NCHS Campus API."""
-    
     clean_phone = re.sub(r"\D", "", phone)
     if len(clean_phone) != 10:
         return "Error: The phone number must contain exactly 10 digits."
-
+    # Prepare the payload exactly as the NCHS API expects it
     student_data = {
         "name": name,
         "email": email,
@@ -38,6 +37,7 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
     }
 
     try:
+    # Send instantly to the live NCHS database
         headers = {'Content-Type': 'application/json'}
         api_url = "https://api.nchs.edu.lk/api/website/lead"
         response = requests.post(api_url, json=student_data, headers=headers, timeout=10)
@@ -68,8 +68,6 @@ NCHS CAMPUS DATASET:
 * **Bachelor of Information Technology**: Students can specialize in Software Development or Business Information Systems. The program focuses on building technical expertise, analytical abilities, and problem-solving skills required for technology-driven industries.
 
 
-
-
 - Partnerships
 * NCHS offers distinct transfer pathways to universities in the USA and the UK.
 * While the site outlines pathways to over 15 top UK universities and specific USA institutions like California State University (Northridge and Fresno), specific curriculum details for Ulster University and California State University, Monterey Bay are not prominently detailed on the primary academic program pages.
@@ -89,6 +87,7 @@ Health Care Professionals Scholarships
 Armed Forces / Police Scholarships
 """
 
+# --- NEW: Session management dictionary ---
 active_sessions = {}
 
 def get_initial_history():
@@ -99,34 +98,34 @@ def get_initial_history():
         Use this dataset: {nchs_dataset}
 
         WORKFLOW:
-        1. LANGUAGE MATCHING: Always respond in the exact language the user types in (e.g., English, Sinhala). Translate your conversational text, greetings, and answers accordingly.
-        
-        2. THE FORM TEMPLATE RULE (CRITICAL): Whenever you ask for the user's details, you MUST append the exact English block below to trigger the system. DO NOT translate this block into Sinhala or any other language:
-           "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
-           Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
-           
-        3. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier):
-           - Answer their questions directly in their language.
+        1. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier in the conversation):
+           - Simply answer their questions directly and concisely.
            - DO NOT ask if they want to speak to a counselor again.
            - DO NOT output the contact form template again under any circumstances.
            
-        4. IF the user has NOT provided details yet and starts with a simple greeting:
-           - Respond with a friendly greeting in their language asking how you can help, and politely ask if they would like to speak with a counselor for further assistance.
+        2. IF the user has NOT provided details yet and starts with a simple greeting (e.g., "Hi", "Hello"):
+           - Respond EXACTLY with: "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
            - STOP. Do NOT send the contact form template yet. Wait for their response.
            
-        5. IF the user has NOT provided details yet and agrees to speak with a counselor:
-           - Acknowledge their agreement in their language.
-           - Then, IMMEDIATELY append the EXACT English form template from Rule 2.
+        3. IF the user has NOT provided details yet and agrees to speak with a counselor (e.g., "yes", "okay", "sure"):
+           - Respond with: "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process."
+           - Append this EXACT template to trigger the form:
+             "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
              
-        6. IF the user has NOT provided details yet and asks a specific question about the campus, courses, or pathways:
-           - CONTEXT CHECK: Check the chat history. If you have NOT greeted the user yet, start with a brief, friendly greeting in their language. If you have ALREADY greeted them previously, DO NOT greet them again.
-           - Answer their question in their language.
-           - Then, IMMEDIATELY append the EXACT English form template from Rule 2.
+        4. IF the user has NOT provided details yet and asks a specific question about the campus, courses, or pathways:
+           - CONTEXT CHECK: Check the chat history. If you have NOT greeted the user yet, start with a brief, friendly greeting (e.g., "Hello!", "Hi there!", "Welcome!"). If you have ALREADY greeted them previously in this conversation, DO NOT greet them again.
+           - Answer their question.
+           - Then, IMMEDIATELY append this exact text block below your answer to trigger the form:
+             "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
+             Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
              
-        7. When the user provides their details through the form, call the save_contact_info tool. 
-           CRITICAL SCORING RULE: Evaluate interest level from 1 to 5.
+        5. When the user provides their details through the form, call the save_contact_info tool. 
+           CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
+           - 1 or 2 = Low interest (casual browsing, short or vague questions).
+           - 3 = Medium interest (asking about general course options).
+           - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
            
-        8. Once successfully saved, thank them in their language and inform them a representative will reach out."""
+        6. Once successfully saved, thank them and inform them a representative will reach out."""
         }
     ]
 
@@ -155,16 +154,20 @@ tools = [
     }
 ]
 
+# 4. Main Response Generator
 def generate_response(user_message: str, session_id: str = "default_session") -> str:
+    # --- NEW: Grab or create specific session history ---
     if session_id not in active_sessions:
         active_sessions[session_id] = get_initial_history()
         
     user_chat_history = active_sessions[session_id]
 
+    # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return "Error: LLAMA_API_KEY was not found in your environment variables."
 
+    # Initialize the client dynamically
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1"
@@ -185,11 +188,14 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
         if response_message.tool_calls:
             user_chat_history.append(response_message)
             
+            # Create a variable to hold the user's name
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
+                    
+                    # Capture the name from the form arguments
                     submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
@@ -219,9 +225,10 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
             )
             final_text = final_response.choices[0].message.content
             
+            # FALLBACK FIX: Now dynamically includes the user's first name
             if not final_text:
                 if submitted_name:
-                    first_name = submitted_name.split()[0]
+                    first_name = submitted_name.split()[0] # Grabs just the first name
                     final_text = f"Thank you, {first_name}! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 else:
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
@@ -232,6 +239,8 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
         else:
             final_text = response_message.content
 
+            # --- TARGETED FIX: Python-level Failsafe ---
+            # If the tool has been used, forcefully scrub the template if the AI hallucinates it
             form_submitted = any((isinstance(msg, dict) and msg.get("role") == "tool" and msg.get("name") == "save_contact_info") for msg in user_chat_history)
             
             if final_text and form_submitted and "Name:" in final_text and "Email:" in final_text:
@@ -242,6 +251,7 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
                     
                 if not final_text:
                     final_text = "I have noted that down. Is there anything else you'd like to know about our programs?"
+            # -------------------------------------------
             
             if not final_text:
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
