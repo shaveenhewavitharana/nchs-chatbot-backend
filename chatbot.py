@@ -62,18 +62,15 @@ NCHS CAMPUS DATASET:
 * **UniLink Diploma in Health Science**: This diploma provides an alternative pathway to a bachelor's degree, allowing students to study concepts, theories, and evidence related to modern health science and global health issues.
 * **Health Science Specializations**: Successful completion provides advanced standing into bachelor's degrees in fields such as Biomedical Science, Health Science, Nutrition, and Psychological Sciences.
 
-
 - Federation University Programmes
 * These are full-time, three-year degree programs delivered on campus in Colombo.
 * The programs offer three intakes per year: February, June, and October.
 * **Bachelor of Business**: This degree allows students to major in either Management or Marketing. It is designed to equip students with the necessary skills to thrive in the corporate landscape, whether they aim to launch a startup, grow a family business, or build a global career.
 * **Bachelor of Information Technology**: Students can specialize in Software Development or Business Information Systems. The program focuses on building technical expertise, analytical abilities, and problem-solving skills required for technology-driven industries.
 
-
 - Partnerships
 * NCHS offers distinct transfer pathways to universities in the USA and the UK.
 * While the site outlines pathways to over 15 top UK universities and specific USA institutions like California State University (Northridge and Fresno), specific curriculum details for Ulster University and California State University, Monterey Bay are not prominently detailed on the primary academic program pages.
-
 
 NCHS Excellence Scholarships (For Study in Sri Lanka)
 If you begin your studies locally in Sri Lanka, NCHS offers several institutional scholarships:
@@ -95,7 +92,7 @@ def get_initial_history():
     return [
         {
             "role": "system",
-            "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise but always maintain a welcoming tone.
+            "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise.
         Use this dataset: {nchs_dataset}
 
         WORKFLOW:
@@ -114,18 +111,14 @@ def get_initial_history():
            - Respond in their language asking how you can help, and politely ask if they would like to speak with a counselor for further assistance.
            - STOP. Do NOT send the contact form template yet. Wait for their response.
            
-        5. IF the user agrees to speak with a counselor and has NOT provided details yet:
-           - Acknowledge their agreement in their language.
-           - IMMEDIATELY append the EXACT English form template from Rule 2.
-             
-        6. IF the user asks a specific question about the campus, courses, or pathways and has NOT provided details yet:
+        5. IF the user asks a specific question about the campus, courses, or pathways and has NOT provided details yet:
            - Answer their question in their language.
            - IMMEDIATELY append the EXACT English form template from Rule 2.
              
-        7. When the user provides their details through the form, call the save_contact_info tool. 
+        6. When the user provides their details through the form, call the save_contact_info tool. 
            CRITICAL SCORING RULE: Evaluate interest level from 1 to 5.
            
-        8. Once successfully saved, thank them in their language and inform them a representative will reach out."""
+        7. Once successfully saved, thank them in their language and inform them a representative will reach out."""
         }
     ]
 
@@ -161,8 +154,7 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
         
     user_chat_history = active_sessions[session_id]
 
-    # --- THE FIX: DYNAMIC TURN COUNTING ---
-    # We check if the history only contains the initial system prompt (length <= 1)
+    # Evaluate if this is the very first message from the user
     is_first_turn = len(user_chat_history) <= 1
 
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
@@ -176,40 +168,37 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
 
     user_chat_history.append({"role": "user", "content": user_message})
 
-    # --- DYNAMIC RULE INJECTION ---
-    # We copy the history to avoid permanently polluting the memory with strict rules.
+    # Dynamic System Instruction Injection
     api_messages = list(user_chat_history)
-    
     if is_first_turn:
         api_messages.append({
             "role": "system", 
-            "content": "STRICT RULE: This is your FIRST response to the user. You MUST include a friendly greeting (e.g., 'Hello!', 'Hi there!') before answering."
+            "content": "STRICT RULE: This is your FIRST response to the user. You MUST start your message with a friendly greeting (e.g., 'Hello!', 'Hi there!')."
         })
     else:
         api_messages.append({
             "role": "system", 
-            "content": "STRICT RULE: You have ALREADY greeted the user. DO NOT say 'Hello', 'Hi', 'Welcome', or any other greeting in this response. Start immediately with the answer."
+            "content": "STRICT RULE: You have ALREADY greeted the user. DO NOT say 'Hello', 'Hi', 'Welcome', or any other greeting. Start directly with the answer."
         })
 
     try:
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
-            messages=api_messages, # We send the temporarily augmented messages to the AI
+            messages=api_messages,
             tools=tools,
             temperature=0.5
         )
         
         response_message = response.choices[0].message
+        final_text = ""
 
         if response_message.tool_calls:
             user_chat_history.append(response_message)
-            
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
-                    
                     submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
@@ -232,11 +221,10 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
                         "content": function_result
                     })
             
-            # For the post-tool-call response, we also ensure it doesn't try to say hello again
             final_api_messages = list(user_chat_history)
             final_api_messages.append({
                 "role": "system",
-                "content": "STRICT RULE: Do NOT use any greetings. Just confirm the details are saved."
+                "content": "STRICT RULE: Confirm the details are saved. DO NOT use any greetings like Hello or Hi."
             })
             
             final_response = client.chat.completions.create(
@@ -253,9 +241,6 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
                 else:
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 
-            user_chat_history.append({"role": "assistant", "content": final_text})
-            return final_text
-            
         else:
             final_text = response_message.content
 
@@ -273,8 +258,23 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
             if not final_text:
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
                  
-            user_chat_history.append({"role": "assistant", "content": final_text})
-            return final_text
+        # --- PYTHON-LEVEL GREETING SCRUBBER ---
+        # If this is not the first turn, physically strip hallucinated greetings from the start of the text
+        if not is_first_turn and final_text:
+            greeting_patterns = [
+                r"^(hi\s+there|hello\s+there)[!.,\s]*",
+                r"^(hi|hello|hey|greetings|welcome)[!.,\s]*",
+                r"^(ආයුබෝවන්|හලෝ)[!.,\s]*"
+            ]
+            for pattern in greeting_patterns:
+                final_text = re.sub(pattern, "", final_text, flags=re.IGNORECASE).strip()
+            
+            # Capitalize the first letter if the stripping left it lowercase
+            if final_text and final_text[0].islower():
+                final_text = final_text[0].upper() + final_text[1:]
+
+        user_chat_history.append({"role": "assistant", "content": final_text})
+        return final_text
 
     except Exception as e:
         return f"API Error: {str(e)}"
