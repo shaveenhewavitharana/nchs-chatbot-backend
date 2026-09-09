@@ -257,6 +257,7 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
                  
         # --- PYTHON-LEVEL GREETING SCRUBBER ---
+        # If this is not the first turn, physically strip hallucinated greetings from the start of the text
         if not is_first_turn and final_text:
             greeting_patterns = [
                 r"^(hi\s+there|hello\s+there)[!.,\s]*",
@@ -266,6 +267,7 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
             for pattern in greeting_patterns:
                 final_text = re.sub(pattern, "", final_text, flags=re.IGNORECASE).strip()
             
+            # Capitalize the first letter if the stripping left it lowercase
             if final_text and final_text[0].islower():
                 final_text = final_text[0].upper() + final_text[1:]
 
