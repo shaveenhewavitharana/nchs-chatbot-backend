@@ -19,9 +19,9 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
     clean_phone = re.sub(r"\D", "", phone)
     if len(clean_phone) != 10:
         return "Error: The phone number must contain exactly 10 digits."
+    
     # Prepare the payload exactly as the NCHS API expects it
     student_data = {
-
         "name": name,
         "email": email,
         "mobile": clean_phone,
@@ -38,453 +38,232 @@ def save_contact_info(name: str, phone: str, email: str, branch: str, pathway: s
     }
 
     try:
-    # Send instantly to the live NCHS database
+        # Send instantly to the live NCHS database
         headers = {'Content-Type': 'application/json'}
-
         api_url = "https://api.nchs.edu.lk/api/website/lead"
-
         response = requests.post(api_url, json=student_data, headers=headers, timeout=10)
-
         
-
         if response.status_code == 200 and response.json().get("success"):
-
             return "Contact information processed and delivered to counselors successfully."
-
         else:
-
             return "Contact information processed, but API delivery failed."
-
             
-
     except Exception as e:
-
         return f"Error sending to API: {str(e)}"
 
 
-
 # 3. Define the Tool and Instructions for Llama
-
 nchs_dataset = """
-
 NCHS CAMPUS DATASET:
 
-
-
 - Swinburne University Pathways
-
 * NCHS offers pathway programs carefully designed to prepare students for academic success and a transfer to Swinburne University of Technology.
-
 * Students can apply for the UniLink Diploma utilizing their A/Level results or by successfully completing a recognized foundation-level program.
-
 * **UniLink Diploma in Health Science**: This diploma provides an alternative pathway to a bachelor's degree, allowing students to study concepts, theories, and evidence related to modern health science and global health issues.
-
 * **Health Science Specializations**: Successful completion provides advanced standing into bachelor's degrees in fields such as Biomedical Science, Health Science, Nutrition, and Psychological Sciences.
 
 
-
-
-
 - Federation University Programmes
-
 * These are full-time, three-year degree programs delivered on campus in Colombo.
-
 * The programs offer three intakes per year: February, June, and October.
-
 * **Bachelor of Business**: This degree allows students to major in either Management or Marketing. It is designed to equip students with the necessary skills to thrive in the corporate landscape, whether they aim to launch a startup, grow a family business, or build a global career.
-
 * **Bachelor of Information Technology**: Students can specialize in Software Development or Business Information Systems. The program focuses on building technical expertise, analytical abilities, and problem-solving skills required for technology-driven industries.
 
 
-
-
-
-
-
-
-
 - Partnerships
-
 * NCHS offers distinct transfer pathways to universities in the USA and the UK.
-
 * While the site outlines pathways to over 15 top UK universities and specific USA institutions like California State University (Northridge and Fresno), specific curriculum details for Ulster University and California State University, Monterey Bay are not prominently detailed on the primary academic program pages.
 
 
-
-
-
 NCHS Excellence Scholarships (For Study in Sri Lanka)
-
 If you begin your studies locally in Sri Lanka, NCHS offers several institutional scholarships:
-
 Value: Students can receive scholarships covering up to 70% of their tuition for their tenure in Sri Lanka.
-
 Eligibility: Scholarships are awarded based on individual excellence rather than the specific course selected. Criteria include academic performance, extracurricular/athletic achievements, and leadership qualities.
-
 Eligible Programs: These apply directly to the Swinburne Foundation Program and the UniLink Diploma Program.
 
-
-
 Categories Available:
-
 Academic Excellence Scholarships
-
 Sports Achievers Scholarships
-
 Leadership Scholarships (specifically for Head Prefects and Deputy Head Prefects)
-
 Health Care Professionals Scholarships
-
 Armed Forces / Police Scholarships
-
 """
 
-
-
 # --- NEW: Session management dictionary ---
-
 active_sessions = {}
 
-
-
 def get_initial_history():
-
     return [
-
         {
-
             "role": "system",
-
             "content": f"""You are a friendly campus assistant for Nawaloka College of Higher Education (NCHS). Keep answers concise but always maintain a welcoming tone.
-
         Use this dataset: {nchs_dataset}
 
-
-
         WORKFLOW:
-
-        1. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier in the conversation):
-
-           - Simply answer their questions directly and concisely.
-
+        1. LANGUAGE MATCHING: Always respond in the exact language the user types in (e.g., English, Sinhala). Translate your conversational text, greetings, and answers accordingly.
+        
+        2. THE GREETING RULE (CRITICAL): Check the conversation history. 
+           - If this is your VERY FIRST response in the session: You MUST include a friendly greeting in their language, even if they just asked a long question without saying hi.
+           - If you have ALREADY responded previously in the session: You must NEVER use greetings again. Jump straight into your answer without pleasantries.
+           
+        3. THE FORM TEMPLATE RULE (CRITICAL): Whenever you ask for the user's details, you MUST append the exact English block below to trigger the system. DO NOT translate this block into Sinhala or any other language:
+           "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
+           Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
+           
+        4. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier):
+           - Answer their questions directly.
            - DO NOT ask if they want to speak to a counselor again.
-
            - DO NOT output the contact form template again under any circumstances.
-
            
-
-        2. IF the user has NOT provided details yet and starts with a simple greeting (e.g., "Hi", "Hello"):
-
-           - Respond EXACTLY with: "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
-
+        5. IF the user starts with a simple greeting (e.g., "Hi", "Hello") and has NOT provided details yet:
+           - Respond in their language asking how you can help, and politely ask if they would like to speak with a counselor for further assistance.
            - STOP. Do NOT send the contact form template yet. Wait for their response.
-
            
-
-        3. IF the user has NOT provided details yet and agrees to speak with a counselor (e.g., "yes", "okay", "sure"):
-
-           - Respond with: "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process."
-
-           - Append this EXACT template to trigger the form:
-
-             "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
-
+        6. IF the user agrees to speak with a counselor and has NOT provided details yet:
+           - Acknowledge their agreement in their language (without a greeting).
+           - IMMEDIATELY append the EXACT English form template from Rule 3.
              
-
-        4. IF the user has NOT provided details yet and asks a specific question about the campus, courses, or pathways:
-
-           - Start your response with a brief, friendly, and varied greeting (e.g., "Hello!", "Hi there!", "Welcome!"). 
-
-           - Answer their question.
-
-           - Then, IMMEDIATELY append this exact text block below your answer to trigger the form:
-
-             "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
-
-             Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
-
+        7. IF the user asks a specific question about the campus, courses, or pathways and has NOT provided details yet:
+           - Apply the GREETING RULE (Rule 2).
+           - Answer their question in their language.
+           - IMMEDIATELY append the EXACT English form template from Rule 3.
              
-
-        5. When the user provides their details through the form, call the save_contact_info tool. 
-
-           CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
-
-           - 1 or 2 = Low interest (casual browsing, short or vague questions).
-
-           - 3 = Medium interest (asking about general course options).
-
-           - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
-
+        8. When the user provides their details through the form, call the save_contact_info tool. 
+           CRITICAL SCORING RULE: Evaluate interest level from 1 to 5.
            
-
-        6. Once successfully saved, thank them and inform them a representative will reach out."""
-
+        9. Once successfully saved, thank them in their language and inform them a representative will reach out."""
         }
-
     ]
 
-
-
 tools = [
-
     {
-
         "type": "function",
-
         "function": {
-
             "name": "save_contact_info",
-
             "description": "Saves a user's name, email, phone number, branch, pathway, and an evaluated interest score.",
-
             "parameters": {
-
                 "type": "object",
-
                 "properties": {
-
                     "name": {"type": "string", "description": "The user's name"},
-
                     "email": {"type": "string", "description": "The user's email address"},
-
                     "phone": {"type": "string", "description": "The Your phone number"},
-
                     "branch": {"type": "string", "description": "The chosen branch (CMB or KND)"},
-
                     "pathway": {"type": "string", "description": "The chosen pathway (SUT or USA or UK or FED or CAN)"},
-
                     "interest_score": {
-
                         "type": "string", 
-
                         "description": "An AI-evaluated score (e.g., '1', '3', '5') indicating how likely the user is to enroll."
-
                     }
-
                 },
-
                 "required": ["name", "email", "phone", "branch", "pathway", "interest_score"]
-
             }
-
         }
-
     }
-
 ]
 
-
-
 # 4. Main Response Generator
-
 def generate_response(user_message: str, session_id: str = "default_session") -> str:
-
     # --- NEW: Grab or create specific session history ---
-
     if session_id not in active_sessions:
-
         active_sessions[session_id] = get_initial_history()
-
         
-
     user_chat_history = active_sessions[session_id]
 
-
-
     # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
-
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
-
     if not api_key:
-
         return "Error: LLAMA_API_KEY was not found in your environment variables."
 
-
-
     # Initialize the client dynamically
-
     client = OpenAI(
-
         api_key=api_key,
-
         base_url="https://api.groq.com/openai/v1"
-
     )
-
-
 
     user_chat_history.append({"role": "user", "content": user_message})
 
-
-
     try:
-
         response = client.chat.completions.create(
-
             model="openai/gpt-oss-120b",
-
             messages=user_chat_history,
-
             tools=tools,
-
             temperature=0.5
-
         )
-
         
-
         response_message = response.choices[0].message
 
-
-
         if response_message.tool_calls:
-
             user_chat_history.append(response_message)
-
             
-
             # Create a variable to hold the user's name
-
             submitted_name = ""
-
             
-
             for tool_call in response_message.tool_calls:
-
                 if tool_call.function.name == "save_contact_info":
-
                     args = json.loads(tool_call.function.arguments)
-
                     
-
                     # Capture the name from the form arguments
-
                     submitted_name = args.get("name", "").strip()
-
                     
-
                     raw_score = str(args.get("interest_score", "3"))
-
                     match = re.search(r'\d', raw_score)
-
                     final_score = int(match.group()) if match else 3
 
-
-
                     function_result = save_contact_info(
-
                         name=args.get("name"), 
-
                         phone=args.get("phone"),
-
                         email=args.get("email", "N/A"),
-
                         branch=args.get("branch", "N/A"),
-
                         pathway=args.get("pathway", "N/A"),
-
                         interest_score=final_score
-
                     )
-
                     
-
                     user_chat_history.append({
-
                         "role": "tool",
-
                         "tool_call_id": tool_call.id,
-
                         "name": "save_contact_info",
-
                         "content": function_result
-
                     })
-
             
-
             final_response = client.chat.completions.create(
-
                model="openai/gpt-oss-120b",
-
                messages=user_chat_history,
-
                tools=tools 
-
             )
-
             final_text = final_response.choices[0].message.content
-
             
-
             # FALLBACK FIX: Now dynamically includes the user's first name
-
             if not final_text:
-
                 if submitted_name:
-
                     first_name = submitted_name.split()[0] # Grabs just the first name
-
                     final_text = f"Thank you, {first_name}! Your details have been successfully saved, and a counselor will reach out to you shortly."
-
                 else:
-
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
-
                 
-
             user_chat_history.append({"role": "assistant", "content": final_text})
-
             return final_text
-
             
-
         else:
-
             final_text = response_message.content
 
-
-
             # --- TARGETED FIX: Python-level Failsafe ---
-
             # If the tool has been used, forcefully scrub the template if the AI hallucinates it
-
             form_submitted = any((isinstance(msg, dict) and msg.get("role") == "tool" and msg.get("name") == "save_contact_info") for msg in user_chat_history)
-
             
-
             if final_text and form_submitted and "Name:" in final_text and "Email:" in final_text:
-
                 if "Please provide your details" in final_text:
-
                     final_text = final_text.split("Please provide your details")[0].strip()
-
                 else:
-
                     final_text = final_text.split("Name:")[0].strip()
-
                     
-
                 if not final_text:
-
                     final_text = "I have noted that down. Is there anything else you'd like to know about our programs?"
-
             # -------------------------------------------
-
             
-
             if not final_text:
-
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
-
                  
-
             user_chat_history.append({"role": "assistant", "content": final_text})
-
             return final_text
 
-
-
     except Exception as e:
-
         return f"API Error: {str(e)}"
