@@ -98,9 +98,8 @@ def get_initial_history():
         WORKFLOW:
         1. LANGUAGE MATCHING: Always respond in the exact language the user types in (e.g., English, Sinhala). Translate your conversational text, greetings, and answers accordingly.
            
-        2. THE FORM TEMPLATE RULE (CRITICAL): Whenever you ask for the user's details, you MUST append the exact English block below to trigger the system. DO NOT translate this block into Sinhala or any other language:
-           "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
-           Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
+        2. THE FORM TEMPLATE RULE (CRITICAL): Whenever you ask for the user's details, you MUST first write a customized, context-specific sentence inviting them to provide their information (e.g., "To find out which scholarships you qualify for, please provide your details below." or "Fill in your details to learn more about our IT degree."). Translate this invitation into the user's chosen language. THEN, immediately append the exact English block below to trigger the system. DO NOT translate the block itself:
+           Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]
            
         3. IF the user has ALREADY provided their details:
            - Answer their questions directly.
@@ -113,7 +112,7 @@ def get_initial_history():
            
         5. IF the user asks a specific question about the campus, courses, or pathways and has NOT provided details yet:
            - Answer their question in their language.
-           - IMMEDIATELY append the EXACT English form template from Rule 2.
+           - Immediately generate a context-appropriate closing sentence and append the EXACT English form template from Rule 2.
              
         6. When the user provides their details through the form, call the save_contact_info tool. 
            CRITICAL SCORING RULE: Evaluate interest level from 1 to 5.
@@ -246,11 +245,10 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
 
             form_submitted = any((isinstance(msg, dict) and msg.get("role") == "tool" and msg.get("name") == "save_contact_info") for msg in user_chat_history)
             
+            # --- UPDATED PYTHON FAILSAFE ---
+            # It now solely targets "Name:" to cleanly split hallucinated templates
             if final_text and form_submitted and "Name:" in final_text and "Email:" in final_text:
-                if "Please provide your details" in final_text:
-                    final_text = final_text.split("Please provide your details")[0].strip()
-                else:
-                    final_text = final_text.split("Name:")[0].strip()
+                final_text = final_text.split("Name:")[0].strip()
                     
                 if not final_text:
                     final_text = "I have noted that down. Is there anything else you'd like to know about our programs?"
@@ -259,7 +257,6 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
                  
         # --- PYTHON-LEVEL GREETING SCRUBBER ---
-        # If this is not the first turn, physically strip hallucinated greetings from the start of the text
         if not is_first_turn and final_text:
             greeting_patterns = [
                 r"^(hi\s+there|hello\s+there)[!.,\s]*",
@@ -269,7 +266,6 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
             for pattern in greeting_patterns:
                 final_text = re.sub(pattern, "", final_text, flags=re.IGNORECASE).strip()
             
-            # Capitalize the first letter if the stripping left it lowercase
             if final_text and final_text[0].islower():
                 final_text = final_text[0].upper() + final_text[1:]
 
