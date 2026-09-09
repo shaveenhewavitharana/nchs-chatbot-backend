@@ -91,7 +91,7 @@ Health Care Professionals Scholarships
 Armed Forces / Police Scholarships
 """
 
-# --- NEW: Session management dictionary ---
+# --- Session management dictionary ---
 active_sessions = {}
 
 def get_initial_history():
@@ -102,34 +102,36 @@ def get_initial_history():
         Use this dataset: {nchs_dataset}
 
         WORKFLOW:
-        1. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier in the conversation):
+        1. LANGUAGE DETECTION: You must automatically detect the language the user is typing in (e.g., English, Sinhala). You MUST respond in that exact same language. Seamlessly translate your greetings, answers, and form requests into their chosen language.
+        
+        2. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier in the conversation):
            - Simply answer their questions directly and concisely.
            - DO NOT ask if they want to speak to a counselor again.
            - DO NOT output the contact form template again under any circumstances.
            
-        2. IF the user has NOT provided details yet and starts with a simple greeting (e.g., "Hi", "Hello"):
+        3. IF the user has NOT provided details yet and starts with a simple greeting (e.g., "Hi", "Hello"):
            - Respond EXACTLY with: "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
            - STOP. Do NOT send the contact form template yet. Wait for their response.
            
-        3. IF the user has NOT provided details yet and agrees to speak with a counselor (e.g., "yes", "okay", "sure"):
+        4. IF the user has NOT provided details yet and agrees to speak with a counselor (e.g., "yes", "okay", "sure"):
            - Respond with: "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process."
            - Append this EXACT template to trigger the form:
              "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
              
-        4. IF the user has NOT provided details yet and asks a specific question about the campus, courses, or pathways:
+        5. IF the user has NOT provided details yet and asks a specific question about the campus, courses, or pathways:
            - Start your response with a brief, friendly, and varied greeting (e.g., "Hello!", "Hi there!", "Welcome!"). 
            - Answer their question.
            - Then, IMMEDIATELY append this exact text block below your answer to trigger the form:
              "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
              Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
              
-        5. When the user provides their details through the form, call the save_contact_info tool. 
+        6. When the user provides their details through the form, call the save_contact_info tool. 
            CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
            - 1 or 2 = Low interest (casual browsing, short or vague questions).
            - 3 = Medium interest (asking about general course options).
            - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
            
-        6. Once successfully saved, thank them and inform them a representative will reach out."""
+        7. Once successfully saved, thank them and inform them a representative will reach out."""
         }
     ]
 
@@ -160,7 +162,7 @@ tools = [
 
 # 4. Main Response Generator
 def generate_response(user_message: str, session_id: str = "default_session") -> str:
-    # --- NEW: Grab or create specific session history ---
+    # --- Grab or create specific session history ---
     if session_id not in active_sessions:
         active_sessions[session_id] = get_initial_history()
         
