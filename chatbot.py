@@ -89,7 +89,6 @@ Health Care Professionals Scholarships
 Armed Forces / Police Scholarships
 """
 
-# --- NEW: Session management dictionary ---
 active_sessions = {}
 
 def get_initial_history():
@@ -100,36 +99,33 @@ def get_initial_history():
         Use this dataset: {nchs_dataset}
 
         WORKFLOW:
-        1. THE SINGLE GREETING RULE (CRITICAL): You must NEVER say "Hello", "Hi", "Welcome", or any other greeting if you have ALREADY greeted the user earlier in the conversation. Only greet the user ONCE during their first interaction. In all subsequent messages, jump straight to the answer without pleasantries.
-        
-        2. IF the user has ALREADY provided their details (i.e., the save_contact_info tool was called earlier in the conversation):
-           - Answer their questions directly and concisely (NO greetings).
+        1. LANGUAGE MATCHING: Always respond in the exact language the user types in (e.g., English, Sinhala). Translate your conversational text, greetings, and answers accordingly.
+           
+        2. THE FORM TEMPLATE RULE (CRITICAL): Whenever you ask for the user's details, you MUST append the exact English block below to trigger the system. DO NOT translate this block into Sinhala or any other language:
+           "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
+           Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
+           
+        3. IF the user has ALREADY provided their details:
+           - Answer their questions directly.
            - DO NOT ask if they want to speak to a counselor again.
            - DO NOT output the contact form template again under any circumstances.
            
-        3. IF the user starts with a simple greeting (e.g., "Hi", "Hello") and has NOT provided details yet:
-           - Respond EXACTLY with: "Hello! 👋 How can I help you today? If you’d like more details about our programmes or pathways, just let me know. Would you like to speak with a counselor for further assistance?"
+        4. IF the user starts with a simple greeting (e.g., "Hi", "Hello") and has NOT provided details yet:
+           - Respond in their language asking how you can help, and politely ask if they would like to speak with a counselor for further assistance.
            - STOP. Do NOT send the contact form template yet. Wait for their response.
            
-        4. IF the user agrees to speak with a counselor (e.g., "yes", "okay", "sure") and has NOT provided details yet:
-           - Respond directly (NO greetings) with: "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process."
-           - Append this EXACT template to trigger the form:
-             "Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
+        5. IF the user agrees to speak with a counselor and has NOT provided details yet:
+           - Acknowledge their agreement in their language.
+           - IMMEDIATELY append the EXACT English form template from Rule 2.
              
-        5. IF the user asks a specific question about the campus, courses, or pathways and has NOT provided details yet:
-           - CONTEXT CHECK: Check the chat history. If this is the FIRST message of the conversation, start with a friendly greeting (e.g., "Hello!", "Hi there!"). If you have ALREADY replied to them previously, DO NOT greet them again.
-           - Answer their question directly.
-           - Then, IMMEDIATELY append this exact text block below your answer to trigger the form:
-             "Please provide your details so you can speak with a consultant and learn more about a specific program or the application process.
-             Name: [Your Name], Email: [Your Email], Number: [Your Phone Number], Branch: [Branch], Pathway: [Pathway]"
+        6. IF the user asks a specific question about the campus, courses, or pathways and has NOT provided details yet:
+           - Answer their question in their language.
+           - IMMEDIATELY append the EXACT English form template from Rule 2.
              
-        6. When the user provides their details through the form, call the save_contact_info tool. 
-           CRITICAL SCORING RULE: You must independently evaluate the user's interest level from 1 to 5 based on their chat history.
-           - 1 or 2 = Low interest (casual browsing, short or vague questions).
-           - 3 = Medium interest (asking about general course options).
-           - 4 or 5 = High interest (asking specific questions about applying, tuition fees, deadlines, or entry requirements).
+        7. When the user provides their details through the form, call the save_contact_info tool. 
+           CRITICAL SCORING RULE: Evaluate interest level from 1 to 5.
            
-        7. Once successfully saved, thank them and inform them a representative will reach out."""
+        8. Once successfully saved, thank them in their language and inform them a representative will reach out."""
         }
     ]
 
@@ -160,18 +156,19 @@ tools = [
 
 # 4. Main Response Generator
 def generate_response(user_message: str, session_id: str = "default_session") -> str:
-    # --- NEW: Grab or create specific session history ---
     if session_id not in active_sessions:
         active_sessions[session_id] = get_initial_history()
         
     user_chat_history = active_sessions[session_id]
 
-    # Safely retrieve the API key dynamically inside the function to prevent module-import crashes
+    # --- THE FIX: DYNAMIC TURN COUNTING ---
+    # We check if the history only contains the initial system prompt (length <= 1)
+    is_first_turn = len(user_chat_history) <= 1
+
     api_key = os.environ.get("LLAMA_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return "Error: LLAMA_API_KEY was not found in your environment variables."
 
-    # Initialize the client dynamically
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.groq.com/openai/v1"
@@ -179,10 +176,25 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
 
     user_chat_history.append({"role": "user", "content": user_message})
 
+    # --- DYNAMIC RULE INJECTION ---
+    # We copy the history to avoid permanently polluting the memory with strict rules.
+    api_messages = list(user_chat_history)
+    
+    if is_first_turn:
+        api_messages.append({
+            "role": "system", 
+            "content": "STRICT RULE: This is your FIRST response to the user. You MUST include a friendly greeting (e.g., 'Hello!', 'Hi there!') before answering."
+        })
+    else:
+        api_messages.append({
+            "role": "system", 
+            "content": "STRICT RULE: You have ALREADY greeted the user. DO NOT say 'Hello', 'Hi', 'Welcome', or any other greeting in this response. Start immediately with the answer."
+        })
+
     try:
         response = client.chat.completions.create(
             model="openai/gpt-oss-120b",
-            messages=user_chat_history,
+            messages=api_messages, # We send the temporarily augmented messages to the AI
             tools=tools,
             temperature=0.5
         )
@@ -192,14 +204,12 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
         if response_message.tool_calls:
             user_chat_history.append(response_message)
             
-            # Create a variable to hold the user's name
             submitted_name = ""
             
             for tool_call in response_message.tool_calls:
                 if tool_call.function.name == "save_contact_info":
                     args = json.loads(tool_call.function.arguments)
                     
-                    # Capture the name from the form arguments
                     submitted_name = args.get("name", "").strip()
                     
                     raw_score = str(args.get("interest_score", "3"))
@@ -222,17 +232,23 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
                         "content": function_result
                     })
             
+            # For the post-tool-call response, we also ensure it doesn't try to say hello again
+            final_api_messages = list(user_chat_history)
+            final_api_messages.append({
+                "role": "system",
+                "content": "STRICT RULE: Do NOT use any greetings. Just confirm the details are saved."
+            })
+            
             final_response = client.chat.completions.create(
                model="openai/gpt-oss-120b",
-               messages=user_chat_history,
+               messages=final_api_messages,
                tools=tools 
             )
             final_text = final_response.choices[0].message.content
             
-            # FALLBACK FIX: Now dynamically includes the user's first name
             if not final_text:
                 if submitted_name:
-                    first_name = submitted_name.split()[0] # Grabs just the first name
+                    first_name = submitted_name.split()[0] 
                     final_text = f"Thank you, {first_name}! Your details have been successfully saved, and a counselor will reach out to you shortly."
                 else:
                     final_text = "Thank you! Your details have been successfully saved, and a counselor will reach out to you shortly."
@@ -243,8 +259,6 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
         else:
             final_text = response_message.content
 
-            # --- TARGETED FIX: Python-level Failsafe ---
-            # If the tool has been used, forcefully scrub the template if the AI hallucinates it
             form_submitted = any((isinstance(msg, dict) and msg.get("role") == "tool" and msg.get("name") == "save_contact_info") for msg in user_chat_history)
             
             if final_text and form_submitted and "Name:" in final_text and "Email:" in final_text:
@@ -255,7 +269,6 @@ def generate_response(user_message: str, session_id: str = "default_session") ->
                     
                 if not final_text:
                     final_text = "I have noted that down. Is there anything else you'd like to know about our programs?"
-            # -------------------------------------------
             
             if not final_text:
                  final_text = "I'm sorry, I couldn't process that. Could you please rephrase?"
